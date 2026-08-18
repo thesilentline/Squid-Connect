@@ -1,0 +1,62 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: postgres
+    environment:
+      POSTGRES_DB: ilis
+      POSTGRES_USER: admin_user
+      POSTGRES_PASSWORD: user123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin_user -d ilis"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  java-app:
+    build:
+      context: ./java-app
+    container_name: java-app
+    ports:
+      - "8081:8081"
+    networks:
+      - app-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  python-app:
+    build:
+      context: ./python-app
+      dockerfile: Dockerfile
+
+    container_name: python-app
+
+    ports:
+      - "8080:8080"
+
+    networks:
+      - app-network
+
+    environment:
+      DATABASE_URL: postgresql+asyncpg://admin_user:user123@postgres:5432/chatbot
+      JAVA_API_URL: http://java-app:8081
+      COLLECTION_EVENT_URL: http://java-app:8081/ilis/api/v1/collectionEvent
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+      java-app:
+        condition: service_started
+
+volumes:
+  postgres-data:
+
+networks:
+  app-network:

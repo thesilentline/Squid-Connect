@@ -1,0 +1,8 @@
+com/utiliy/ILIS/config/CorsConfigTest.class
+com/utiliy/ILIS/modules/parser/InferenceEventParserTest.class
+com/utiliy/ILIS/modules/dashboard/controller/DashboardControllerTest.class
+com/utiliy/ILIS/modules/dashboard/service/DashboardServiceTest$2.class
+com/utiliy/ILIS/modules/injection/InjectionServiceTest.class
+com/utiliy/ILIS/modules/dashboard/service/DashboardServiceTest$1.class
+com/utiliy/ILIS/modules/dashboard/service/DashboardServiceTest.class
+com/utiliy/ILIS/modules/webhook/WebhookControllerTest.class
