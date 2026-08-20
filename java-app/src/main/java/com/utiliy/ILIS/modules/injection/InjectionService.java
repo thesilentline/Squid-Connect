@@ -30,9 +30,6 @@ public class InjectionService {
     private final InferenceEventParser inferenceEventParser;
     private ObjectMapper objectMapper = new ObjectMapper();
 
-    /**
-     * Captures incoming raw webhook event and stores it in webhook_data table with PENDING status.
-     */
     @Transactional
     public Map<String, Object> inject(String type, Object request) {
         log.info("Capturing webhook event of type '{}'", type);
@@ -65,10 +62,7 @@ public class InjectionService {
         response.put("eventStatus", saved.getStatus().name());
         return response;
     }
-
-    /**
-     * Processes pending webhook records. Called by InjectionScheduler.
-     */
+    
     public void processPendingWebhooks() {
         List<WebhookData> pendingList = webhookDataRepository.findTop50ByStatusOrderByIdAsc(WebhookData.WebhookStatus.PENDING);
         if (pendingList.isEmpty()) {
@@ -85,9 +79,6 @@ public class InjectionService {
         }
     }
 
-    /**
-     * Parses and persists a single webhook record into Inference & InferencePayload entities.
-     */
     @Transactional
     public void processSingleWebhook(WebhookData webhookData) {
         log.info("Processing webhook event ID: {}", webhookData.getId());
@@ -95,18 +86,14 @@ public class InjectionService {
         webhookDataRepository.save(webhookData);
 
         try {
-            // 1. Parse raw payload
             ParsedInferenceRecord parsed = inferenceEventParser.parse(webhookData.getPayload());
 
-            // 2. Persist InferencePayload
             InferencePayload savedPayload = inferencePayloadRepository.save(parsed.getInferencePayload());
 
-            // 3. Link InferencePayload ID to Inference and persist Inference
             Inference inference = parsed.getInference();
             inference.setInferencePayloadId(savedPayload.getId());
             Inference savedInference = inferenceRepository.save(inference);
 
-            // 4. Update WebhookData to COMPLETED
             webhookData.setStatus(WebhookData.WebhookStatus.COMPLETED);
             webhookData.setErrorMessage(null);
             webhookDataRepository.save(webhookData);

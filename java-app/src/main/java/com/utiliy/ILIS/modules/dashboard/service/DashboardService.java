@@ -22,9 +22,6 @@ public class DashboardService {
 
     private static final Pattern INTERVAL_PATTERN = Pattern.compile("^\\s*(\\d+)\\s*([a-zA-Z]+)\\s*$");
 
-    /**
-     * Retrieves full dashboard metrics including summary and time-series buckets.
-     */
     @Transactional(readOnly = true)
     public DashboardResponse getDashboardMetrics(Instant startTime,
                                                  Instant endTime,
@@ -113,9 +110,6 @@ public class DashboardService {
         return DashboardSummaryResponse.fromProjection(summaryProjection);
     }
 
-    /**
-     * Calculates the duration in seconds for a given interval string (e.g. "5 minutes" -> 300.0).
-     */
     public double calculateBucketSeconds(String intervalStr) {
         if (intervalStr == null || intervalStr.isBlank()) {
             return 300.0;

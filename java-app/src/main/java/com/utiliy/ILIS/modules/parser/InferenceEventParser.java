@@ -29,9 +29,6 @@ public class InferenceEventParser {
         this.objectMapper = new ObjectMapper();
     }
 
-    /**
-     * Parses raw webhook payload into Inference and InferencePayload entities.
-     */
     public ParsedInferenceRecord parse(String rawPayload) {
         if (rawPayload == null || rawPayload.isBlank()) {
             throw new IllegalArgumentException("Raw payload cannot be empty");
@@ -42,7 +39,6 @@ public class InferenceEventParser {
             throw new IllegalArgumentException("Failed to parse payload into JSON structure");
         }
 
-        // If root is an array, take the first element if it's an object, or search inside
         if (rootNode.isArray() && !rootNode.isEmpty()) {
             rootNode = rootNode.get(0);
         }
@@ -51,20 +47,16 @@ public class InferenceEventParser {
     }
 
     private ParsedInferenceRecord extractRecord(JsonNode node) {
-        // 1. Extract request ID
         String requestId = getText(node, "request_id", "requestId", "req_id", "id", "uuid", "eventId", "event_id", "conversation_id", "conversationId");
         if (requestId == null || requestId.isBlank()) {
             requestId = "req-" + UUID.randomUUID().toString();
         }
 
-        // 2. Extract model & provider
         String model = getText(node, "model", "model_name", "modelName", "engine");
         String provider = getText(node, "provider", "provider_name", "providerName", "vendor", "source");
 
-        // 3. Extract user ID
         Long userId = getLong(node, "user_id", "userId", "user", "customerId", "customer_id");
 
-        // 4. Extract event_type & status & error details
         String eventType = getText(node, "event_type", "eventType", "type");
         String statusStr = getText(node, "status", "inference_status", "inferenceStatus", "state");
         Inference.InferenceStatus status = parseStatus(statusStr, eventType);
@@ -72,10 +64,8 @@ public class InferenceEventParser {
         String errorMessage = getText(node, "error_message", "errorMessage", "error", "error_description");
         String errorType = getText(node, "error_type", "errorType", "exception", "exception_type");
 
-        // 5. Look for messages list if present
         JsonNode messagesNode = findNode(node, "conversation_history", "conversationHistory", "messages", "conversation", "history", "events", "chat");
 
-        // If userId is still null, inspect messages for user id
         if (userId == null && messagesNode != null && messagesNode.isArray()) {
             for (JsonNode msg : messagesNode) {
                 String role = getText(msg, "role");
@@ -89,17 +79,14 @@ public class InferenceEventParser {
             }
         }
 
-        // If userId is still null, check conversation_id
         if (userId == null) {
             userId = getLong(node, "conversation_id", "conversationId");
         }
 
-        // 6. Extract token counts
         Integer inputTokens = getInt(node, "input_tokens", "inputTokens", "prompt_tokens", "promptTokens");
         Integer outputTokens = getInt(node, "output_tokens", "outputTokens", "completion_tokens", "completionTokens");
         Integer totalTokens = getInt(node, "total_tokens", "totalTokens", "tokens_used", "tokensUsed");
 
-        // If token counts are not at root, compute from messages
         if (messagesNode != null && messagesNode.isArray()) {
             int calculatedInput = 0;
             int calculatedOutput = 0;
@@ -134,7 +121,6 @@ public class InferenceEventParser {
             }
         }
 
-        // 7. Extract timestamps & latency
         Instant startedAt = parseDate(getText(node, "started_at", "startedAt", "start_time", "startTime"));
         Instant completedAt = parseDate(getText(node, "completed_at", "completedAt", "end_time", "endTime"));
         Instant rootTimestamp = parseDate(getText(node, "timestamp", "created_at", "createdAt", "time"));
@@ -160,7 +146,6 @@ public class InferenceEventParser {
             latencyMs = Math.max(0, Duration.between(startedAt, completedAt).toMillis());
         }
 
-        // 8. Extract input and output content for InferencePayload
         String inputContent = getText(node, "input", "prompt", "query", "user_input");
         String outputContent = getText(node, "output", "response", "completion", "result");
 
@@ -193,7 +178,6 @@ public class InferenceEventParser {
             }
         }
 
-        // For failed inference events without assistant output, record error details in output
         if ((outputContent == null || outputContent.isBlank()) && (errorMessage != null || errorType != null)) {
             if (errorType != null && errorMessage != null) {
                 outputContent = errorType + ": " + errorMessage;
@@ -204,7 +188,6 @@ public class InferenceEventParser {
             }
         }
 
-        // 9. Extract metadata & diagnostic error info
         JsonNode extraParamsNode = findNode(node, "extra_params", "extraParams", "metadata", "params", "options", "config");
         ObjectNode metadataObj = objectMapper.createObjectNode();
 
@@ -224,7 +207,6 @@ public class InferenceEventParser {
 
         String metadataContent = metadataObj.isEmpty() ? null : metadataObj.toString();
 
-        // Build entities
         Inference inference = Inference.builder()
                 .requestId(requestId)
                 .model(model)
@@ -265,7 +247,6 @@ public class InferenceEventParser {
                 log.warn("Failed to parse loose format into structured node: {}", looseParseException.getMessage());
             }
 
-            // Fallback object node containing the raw string as input
             ObjectNode fallback = objectMapper.createObjectNode();
             fallback.put("input", raw);
             fallback.put("request_id", "req-" + UUID.randomUUID().toString());
@@ -273,15 +254,10 @@ public class InferenceEventParser {
         }
     }
 
-    /**
-     * Parses Java toString / Python dict / loose key=value formats into Map/List structure.
-     */
     private Object parseLooseStructure(String raw) {
         String str = raw.trim();
-        // If string is a fragment starting inside a list/map, auto-wrap
         if (!str.startsWith("{") && !str.startsWith("[")) {
             if (str.contains("created_at=") || str.contains("role=") || str.contains("content=")) {
-                // If it looks like a list of message objects or message fragment
                 if (str.contains("],") || str.contains("}")) {
                     str = "{messages=[{" + str;
                     if (!str.endsWith("}")) {
@@ -314,14 +290,13 @@ public class InferenceEventParser {
 
     private Map<String, Object> parseObject(String s, int[] index) {
         Map<String, Object> map = new LinkedHashMap<>();
-        index[0]++; // skip '{'
+        index[0]++;
         skipWhitespace(s, index);
 
         while (index[0] < s.length() && s.charAt(index[0]) != '}') {
             skipWhitespace(s, index);
             if (index[0] >= s.length() || s.charAt(index[0]) == '}') break;
 
-            // read key
             int start = index[0];
             while (index[0] < s.length() && s.charAt(index[0]) != '=' && s.charAt(index[0]) != ':' && s.charAt(index[0]) != '}' && s.charAt(index[0]) != ',') {
                 index[0]++;
@@ -334,7 +309,7 @@ public class InferenceEventParser {
             }
 
             if (index[0] < s.length() && (s.charAt(index[0]) == '=' || s.charAt(index[0]) == ':')) {
-                index[0]++; // skip '=' or ':'
+                index[0]++;
                 skipWhitespace(s, index);
                 Object val = parseValue(s, index);
                 if (!key.isEmpty()) {
@@ -348,20 +323,20 @@ public class InferenceEventParser {
 
             skipWhitespace(s, index);
             if (index[0] < s.length() && s.charAt(index[0]) == ',') {
-                index[0]++; // skip ','
+                index[0]++;
                 skipWhitespace(s, index);
             }
         }
 
         if (index[0] < s.length() && s.charAt(index[0]) == '}') {
-            index[0]++; // skip '}'
+            index[0]++;
         }
         return map;
     }
 
     private List<Object> parseArray(String s, int[] index) {
         List<Object> list = new ArrayList<>();
-        index[0]++; // skip '['
+        index[0]++;
         skipWhitespace(s, index);
 
         while (index[0] < s.length() && s.charAt(index[0]) != ']') {
@@ -373,13 +348,13 @@ public class InferenceEventParser {
 
             skipWhitespace(s, index);
             if (index[0] < s.length() && s.charAt(index[0]) == ',') {
-                index[0]++; // skip ','
+                index[0]++;
                 skipWhitespace(s, index);
             }
         }
 
         if (index[0] < s.length() && s.charAt(index[0]) == ']') {
-            index[0]++; // skip ']'
+            index[0]++;
         }
         return list;
     }
@@ -397,18 +372,17 @@ public class InferenceEventParser {
         boolean inQuotes = startsWithQuote;
 
         if (startsWithQuote) {
-            index[0]++; // skip opening quote
+            index[0]++;
             start = index[0];
             while (index[0] < s.length()) {
                 char c = s.charAt(index[0]);
                 if (c == quoteChar) {
-                    // check for escaped quote
                     if (index[0] > 0 && s.charAt(index[0] - 1) == '\\') {
                         index[0]++;
                         continue;
                     }
                     String val = s.substring(start, index[0]);
-                    index[0]++; // skip closing quote
+                    index[0]++;
                     return val;
                 }
                 index[0]++;
@@ -416,7 +390,6 @@ public class InferenceEventParser {
             return s.substring(start, index[0]);
         }
 
-        // Unquoted scalar
         while (index[0] < s.length()) {
             char c = s.charAt(index[0]);
             if (c == '{') {
@@ -430,7 +403,6 @@ public class InferenceEventParser {
                 if (depthBracket == 0) break;
                 depthBracket--;
             } else if (c == ',' && depthBrace == 0 && depthBracket == 0) {
-                // Check if this comma is followed by a new key= or closing bracket
                 if (isFieldOrElementSeparator(s, index[0] + 1)) {
                     break;
                 }
@@ -464,7 +436,6 @@ public class InferenceEventParser {
         char c = s.charAt(i);
         if (c == '}' || c == ']' || c == '{' || c == '[') return true;
 
-        // Check if next token is identifier followed by '=' or ':'
         int tokenStart = i;
         while (i < s.length() && (Character.isLetterOrDigit(s.charAt(i)) || s.charAt(i) == '_')) {
             i++;

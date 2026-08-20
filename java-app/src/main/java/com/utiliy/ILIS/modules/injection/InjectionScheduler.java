@@ -12,9 +12,6 @@ public class InjectionScheduler {
 
     private final InjectionService injectionService;
 
-    /**
-     * Periodically polls pending webhook events, updates status, and processes them.
-     */
     @Scheduled(fixedDelayString = "${ilis.scheduler.fixed-delay-ms:5000}")
     public void scheduleWebhookProcessing() {
         try {
