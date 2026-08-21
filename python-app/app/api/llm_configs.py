@@ -16,16 +16,16 @@ router = APIRouter()
 
 
 @router.get("/providers", response_model=List[ProviderInfo], summary="List all supported LLM providers and models")
-async def list_supported_providers():
-    """Retrieve metadata for all supported LLM providers and their available models."""
-    return LLMFactory.get_all_providers_info()
+async def list_supported_providers(db: AsyncSession = Depends(get_db)):
+    service = LLMConfigService(db)
+    return await service.get_all_providers_info()
 
 
 @router.get("/providers/{provider}/models", response_model=List[ModelInfo], summary="List models for a specific provider")
-async def list_provider_models(provider: str):
-    """Retrieve supported models for a specific LLM provider."""
+async def list_provider_models(provider: str, db: AsyncSession = Depends(get_db)):
+    service = LLMConfigService(db)
     try:
-        return LLMFactory.get_provider_models(provider)
+        return await service.get_provider_models(provider)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
 

@@ -1,36 +1,36 @@
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, ConfigDict, Field
 
 
 class ProviderConfigCreate(BaseModel):
-    """Payload to store or update LLM provider configuration and API key."""
     provider: str = Field(..., description="Provider name, e.g. openai, anthropic, gemini, groq, ollama")
     api_key: Optional[str] = Field(None, description="Provider API key")
     base_url: Optional[str] = Field(None, description="Custom base URL / endpoint (for Ollama, vLLM, local models)")
     default_model: Optional[str] = Field(None, description="Default model (e.g. gpt-4o, claude-3-5-sonnet)")
+    models: Optional[List[str]] = Field(None, description="Custom list of models configured for this provider")
     custom_parameters: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Custom extra parameters")
     is_default: bool = Field(True, description="Whether to set this provider as the system default")
 
 
 class ProviderConfigUpdate(BaseModel):
-    """Payload for updating an existing provider config."""
     api_key: Optional[str] = None
     base_url: Optional[str] = None
     default_model: Optional[str] = None
+    models: Optional[List[str]] = None
     custom_parameters: Optional[Dict[str, Any]] = None
     is_default: Optional[bool] = None
     is_active: Optional[bool] = None
 
 
 class ProviderConfigResponse(BaseModel):
-    """Response containing safe provider configuration details."""
     id: int
     provider: str
     masked_api_key: str
     has_api_key: bool
     base_url: Optional[str] = None
     default_model: str
+    models: List[str] = Field(default_factory=list, description="List of configured models for this provider")
     custom_parameters: Optional[Dict[str, Any]] = None
     is_active: bool
     is_default: bool

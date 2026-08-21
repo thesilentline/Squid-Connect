@@ -1559,15 +1559,16 @@
 
   <div class="modal-overlay" id="settingsModal">
     <div class="modal">
-      <div class="modal-title">Configure Provider Credentials</div>
+      <div class="modal-title">Configure Provider & Models</div>
       <div class="form-group">
         <label>Provider</label>
-        <select class="form-control" id="modalProvider">
+        <select class="form-control" id="modalProvider" onchange="onModalProviderChanged()">
           <option value="openai">OpenAI</option>
           <option value="anthropic">Anthropic</option>
           <option value="gemini">Google Gemini</option>
           <option value="groq">Groq</option>
           <option value="ollama">Ollama</option>
+          <option value="custom">Custom Endpoint / Proxy</option>
         </select>
       </div>
       <div class="form-group">
@@ -1578,9 +1579,17 @@
         <label>Custom Base URL (optional)</label>
         <input type="text" class="form-control" id="modalBaseUrl" placeholder="http://localhost:11434/v1">
       </div>
+      <div class="form-group">
+        <label>Default Model</label>
+        <input type="text" class="form-control" id="modalDefaultModel" placeholder="e.g. gpt-4o or custom-model">
+      </div>
+      <div class="form-group">
+        <label>Configured Models (comma or newline separated)</label>
+        <textarea class="form-control" id="modalModels" rows="3" placeholder="gpt-4o, gpt-4o-mini, ft:gpt-4o:my-org:custom-model" style="resize: vertical;"></textarea>
+      </div>
       <div class="modal-actions">
         <button class="btn-secondary" onclick="closeSettingsModal()">Cancel</button>
-        <button class="btn-primary" onclick="saveProviderCredentials()">Save Credentials</button>
+        <button class="btn-primary" onclick="saveProviderCredentials()">Save Provider & Models</button>
       </div>
     </div>
   </div>
@@ -1611,29 +1620,84 @@
     let dashCharts = { requests: null, latency: null, tokens: null, errorRate: null };
     let lastMetricsPayload = null;
 
-    const providerModels = {
-      openai: ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'gpt-3.5-turbo'],
-      anthropic: ['claude-3-5-sonnet-20241022', 'claude-3-5-haiku-20241022', 'claude-3-opus-20240229'],
-      gemini: ['gemini-3.5-flash']
-    };
-
-    const providerLabels = {
+    let providerModels = {};
+    let providerLabels = {
       openai: 'OpenAI',
       anthropic: 'Anthropic Claude',
-      gemini: 'Google Gemini'
+      gemini: 'Google Gemini',
+      groq: 'Groq',
+      ollama: 'Ollama',
+      custom: 'Custom Proxy'
     };
-
 
     const paletteCycle = ['var(--olive)', 'var(--lime)', 'var(--sage)', 'var(--forest)'];
 
     window.addEventListener('DOMContentLoaded', async () => {
-      onProviderChanged();
+      await loadProviderConfigs();
       setDashGreeting();
       initMetricsDefaultRange();
       await loadConversations();
       navigateTo('dashboard');
       fetchDashboardMetrics();
     });
+
+    async function loadProviderConfigs() {
+      try {
+        const resp = await fetch(`${API_BASE}/llm/configs`);
+        if (resp.ok) {
+          const configs = await resp.json();
+          configs.forEach(cfg => {
+            const p = cfg.provider.toLowerCase();
+            if (cfg.models && cfg.models.length > 0) {
+              providerModels[p] = cfg.models;
+            } else if (cfg.default_model) {
+              providerModels[p] = [cfg.default_model];
+            }
+          });
+        }
+      } catch (e) {
+        console.warn('Could not fetch configs:', e);
+      }
+
+      try {
+        const pResp = await fetch(`${API_BASE}/llm/providers`);
+        if (pResp.ok) {
+          const providers = await pResp.json();
+          providers.forEach(p => {
+            const pKey = p.name.toLowerCase();
+            if (!providerLabels[pKey]) {
+              providerLabels[pKey] = p.display_name || pKey.toUpperCase();
+            }
+            if (!providerModels[pKey] || providerModels[pKey].length === 0) {
+              providerModels[pKey] = (p.models && p.models.length > 0)
+                ? p.models.map(m => m.id)
+                : [p.default_model || 'default'];
+            }
+          });
+        }
+      } catch (e) {
+        console.warn('Could not fetch providers:', e);
+      }
+
+      const providerSelect = document.getElementById('providerSelect');
+      const curSelected = providerSelect.value;
+      providerSelect.innerHTML = '';
+      const availableProviders = Object.keys(providerModels);
+      if (availableProviders.length === 0) {
+        availableProviders.push('openai', 'anthropic', 'gemini');
+      }
+      availableProviders.forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = p;
+        opt.textContent = providerLabels[p] || p.toUpperCase();
+        providerSelect.appendChild(opt);
+      });
+      if (availableProviders.includes(curSelected)) {
+        providerSelect.value = curSelected;
+      }
+      onProviderChanged();
+      renderQuickstartRow();
+    }
 
 
     function navigateTo(page) {
@@ -2245,8 +2309,44 @@
       return str.replace(/'/g, "\\'").replace(/"/g, '&quot;');
     }
 
-    function openSettingsModal() {
+    async function onModalProviderChanged() {
+      const provider = document.getElementById('modalProvider').value.toLowerCase();
+      const apiKeyInput = document.getElementById('modalApiKey');
+      const baseUrlInput = document.getElementById('modalBaseUrl');
+      const defaultModelInput = document.getElementById('modalDefaultModel');
+      const modelsInput = document.getElementById('modalModels');
+
+      apiKeyInput.value = '';
+      baseUrlInput.value = '';
+      defaultModelInput.value = '';
+      modelsInput.value = '';
+
+      try {
+        const resp = await fetch(`${API_BASE}/llm/configs/${provider}`);
+        if (resp.ok) {
+          const cfg = await resp.json();
+          apiKeyInput.placeholder = cfg.has_api_key ? `Configured (${cfg.masked_api_key}) - leave blank to keep` : 'sk-...';
+          baseUrlInput.value = cfg.base_url || '';
+          defaultModelInput.value = cfg.default_model || '';
+          if (cfg.models && cfg.models.length > 0) {
+            modelsInput.value = cfg.models.join(', ');
+          }
+        } else {
+          const defaultModels = providerModels[provider] || [];
+          apiKeyInput.placeholder = 'sk-...';
+          if (defaultModels.length > 0) {
+            defaultModelInput.value = defaultModels[0];
+            modelsInput.value = defaultModels.join(', ');
+          }
+        }
+      } catch (e) {
+        apiKeyInput.placeholder = 'sk-...';
+      }
+    }
+
+    async function openSettingsModal() {
       document.getElementById('settingsModal').classList.add('open');
+      await onModalProviderChanged();
     }
 
     function closeSettingsModal() {
@@ -2257,17 +2357,35 @@
       const provider = document.getElementById('modalProvider').value;
       const apiKey = document.getElementById('modalApiKey').value.trim();
       const baseUrl = document.getElementById('modalBaseUrl').value.trim();
+      const defaultModel = document.getElementById('modalDefaultModel').value.trim();
+      const rawModels = document.getElementById('modalModels').value.trim();
+
+      const modelsArray = rawModels
+        ? rawModels.split(/[\n,]+/).map(m => m.trim()).filter(m => m.length > 0)
+        : [];
 
       try {
+        const payload = {
+          provider,
+          api_key: apiKey || null,
+          base_url: baseUrl || null,
+          default_model: defaultModel || (modelsArray.length > 0 ? modelsArray[0] : null),
+          models: modelsArray.length > 0 ? modelsArray : null,
+          is_default: true
+        };
+
         const resp = await fetch(`${API_BASE}/llm/configs`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ provider, api_key: apiKey || null, base_url: baseUrl || null, is_default: true })
+          body: JSON.stringify(payload)
         });
 
         if (resp.ok) {
-          alert(`Successfully saved credentials for ${provider.toUpperCase()}`);
+          alert(`Successfully saved configuration and models for ${provider.toUpperCase()}`);
           closeSettingsModal();
+          await loadProviderConfigs();
+          document.getElementById('providerSelect').value = provider;
+          onProviderChanged();
         } else {
           const err = await resp.json();
           alert(`Error saving credentials: ${err.detail || 'Unknown error'}`);
