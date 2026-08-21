@@ -27,7 +27,7 @@ class ProviderConfigRepository:
         )
         result = await self.session.execute(query)
         config = result.scalar_one_or_none()
-        
+
         if not config:
             query = select(ProviderConfig).where(
                 ProviderConfig.is_active == True
@@ -55,7 +55,7 @@ class ProviderConfigRepository:
     ) -> ProviderConfig:
         """Create or update provider configuration."""
         provider_name = provider.lower()
-        
+
         if is_default:
             await self.session.execute(
                 update(ProviderConfig).values(is_default=False)

@@ -14,7 +14,7 @@ class Conversation(Base):
     title: Mapped[str] = mapped_column(String(255), default="New Chat", nullable=False)
     provider: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     model: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
@@ -27,7 +27,6 @@ class Conversation(Base):
         nullable=False,
     )
 
-    # Relationships with async-safe selectin loading
     messages: Mapped[List["Message"]] = relationship(
         "Message",
         back_populates="conversation",

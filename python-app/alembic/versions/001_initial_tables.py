@@ -10,7 +10,6 @@ from alembic import op
 import sqlalchemy as sa
 
 
-# revision identifiers, used by Alembic.
 revision: str = '001_initial_tables'
 down_revision: Union[str, None] = None
 branch_labels: Union[str, Sequence[str], None] = None
@@ -18,7 +17,6 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # 1. provider_configs table
     op.create_table(
         'provider_configs',
         sa.Column('id', sa.Integer(), nullable=False, primary_key=True),
@@ -36,7 +34,6 @@ def upgrade() -> None:
     op.create_index(op.f('ix_provider_configs_id'), 'provider_configs', ['id'], unique=False)
     op.create_index(op.f('ix_provider_configs_provider'), 'provider_configs', ['provider'], unique=True)
 
-    # 2. conversations table
     op.create_table(
         'conversations',
         sa.Column('id', sa.Integer(), nullable=False, primary_key=True),
@@ -49,7 +46,6 @@ def upgrade() -> None:
     )
     op.create_index(op.f('ix_conversations_id'), 'conversations', ['id'], unique=False)
 
-    # 3. messages table
     op.create_table(
         'messages',
         sa.Column('id', sa.Integer(), nullable=False, primary_key=True),

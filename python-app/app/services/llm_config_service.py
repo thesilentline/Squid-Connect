@@ -27,8 +27,7 @@ class LLMConfigService:
         Store or update LLM credentials for a provider.
         """
         provider_name = config_in.provider.lower()
-        
-        # Determine default model if none supplied
+
         default_model = config_in.default_model
         if not default_model:
             try:
@@ -37,10 +36,8 @@ class LLMConfigService:
             except Exception:
                 default_model = "default"
 
-        # Encrypt the API key
         encrypted_key = encrypt_api_key(config_in.api_key) if config_in.api_key else None
 
-        # Upsert into database
         db_config = await self.config_repo.upsert_config(
             provider=provider_name,
             encrypted_api_key=encrypted_key,
@@ -85,7 +82,6 @@ class LLMConfigService:
         else:
             db_config = await self.config_repo.get_default_config()
 
-        # If a DB config exists, use its credentials
         if db_config:
             provider_name = db_config.provider
             decrypted_api_key = decrypt_api_key(db_config.encrypted_api_key)
@@ -93,14 +89,12 @@ class LLMConfigService:
             base_url = db_config.base_url
             custom_params = db_config.custom_parameters or {}
         else:
-            # Fallback to requested provider or OpenAI
             provider_name = (provider or "openai").lower()
             decrypted_api_key = None
             target_model = model or "default"
             base_url = None
             custom_params = {}
 
-        # Instantiate LLM connector via Factory Pattern
         connector = LLMFactory.get_connector(
             provider=provider_name,
             api_key=decrypted_api_key,

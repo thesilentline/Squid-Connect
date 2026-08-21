@@ -16,15 +16,14 @@ class Message(Base):
         index=True,
         nullable=False,
     )
-    role: Mapped[str] = mapped_column(String(50), nullable=False)  # 'user', 'assistant', 'system'
+    role: Mapped[str] = mapped_column(String(50), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
     tokens_used: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
         nullable=False,
     )
 
-    # Relationships
-    conversation: Mapped["Conversation"] = relationship("Conversation", back_populates="messages")
+    conversation: Mapped["Conversation"] = relationship("Conversation", back_populates="messages", lazy="selectin")

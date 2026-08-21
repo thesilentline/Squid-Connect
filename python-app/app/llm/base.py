@@ -7,7 +7,7 @@ from app.llm.types import ChatMessage, LLMResponse, ModelInfo, ProviderInfo
 class LLMConnector(ABC):
     """
     Abstract Base Interface for LLM Providers.
-    
+
     All concrete provider connectors (OpenAI, Anthropic, Gemini, Groq, Ollama, etc.)
     implement this interface to ensure uniform invocation across different LLM backends.
     """
@@ -55,7 +55,7 @@ class LLMConnector(ABC):
     ) -> LLMResponse:
         """
         Generate chat completion for the given conversation messages.
-        
+
         Args:
             messages: List of ChatMessage objects with roles and content.
             model: Specific model identifier or None to use default.
@@ -97,7 +97,6 @@ class LLMConnector(ABC):
         """Return default endpoint URL if applicable."""
         return None
 
-    # Backward compatibility helper for single prompt string
     async def generate_response(self, prompt: str, **kwargs: Any) -> str:
         """Helper to invoke with a simple single user prompt string."""
         response = await self.generate_chat(

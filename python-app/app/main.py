@@ -8,7 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from app.api import api_router, health_router
 from app.core.config import settings
 from app.db.database import Base, engine
-import app.models  # noqa: F401 - Register models with Base.metadata
+import app.models
 import logging
 
 logging.basicConfig(
@@ -36,7 +36,6 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS Middleware configuration
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -45,15 +44,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Static files directory
 STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
 if os.path.exists(STATIC_DIR):
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
-# Single health check endpoint: GET /health
 app.include_router(health_router)
 
-# Versioned API endpoints: /api/v1/...
 app.include_router(api_router, prefix=settings.API_V1_STR)
 
 

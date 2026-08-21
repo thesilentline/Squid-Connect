@@ -84,7 +84,7 @@ class GroqConnector(LLMConnector):
 
         async with httpx.AsyncClient(timeout=45.0) as client:
             response = await client.post(endpoint_url, json=payload, headers=headers)
-            
+
             if response.status_code != 200:
                 error_msg = response.text
                 try:

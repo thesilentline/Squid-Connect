@@ -4,7 +4,6 @@ from typing import Optional
 
 from app.core.config import settings
 
-# Cryptography Fernet for API key storage encryption
 try:
     from cryptography.fernet import Fernet
     HAS_CRYPTOGRAPHY = True

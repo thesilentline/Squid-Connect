@@ -9,5 +9,4 @@ class OpenAIConnector(LLMConnector):
         self.api_key = api_key
 
     async def generate_response(self, prompt: str, **kwargs: Any) -> str:
-        # TODO: Implement OpenAI API integration
         raise NotImplementedError("OpenAI connector is not yet implemented.")

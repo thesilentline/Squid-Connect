@@ -35,7 +35,6 @@ def format_instant(dt: Optional[datetime]) -> Optional[str]:
     if iso.endswith("+00:00"):
         iso = iso[:-6] + "Z"
     elif not iso.endswith("Z"):
-        # Replace timezone offset with Z
         if "+" in iso:
             iso = iso.split("+")[0] + "Z"
         elif iso.count("-") > 2:
@@ -59,7 +58,7 @@ class EventPublisherService:
     """
     Asynchronous event publisher service that dispatches LLM inference events to the
     ILIS event ingestion endpoint (POST /api/v1/collectionEvent?type={status}).
-    
+
     The dispatched payload maps 1:1 to:
       1. com.utiliy.ILIS.modules.entity.Inference
          - requestId (String)
@@ -74,7 +73,7 @@ class EventPublisherService:
          - outputTokens (Integer)
          - totalTokens (Integer)
          - inferencePayloadId (Long)
-      
+
       2. com.utiliy.ILIS.modules.entity.InferencePayload
          - input (TEXT String)
          - output (TEXT String)
@@ -145,35 +144,33 @@ class EventPublisherService:
         output_tokens: Optional[int] = None,
         total_tokens: Optional[int] = None,
         user_id: Optional[int] = None,
+        conversation_id: Optional[int] = None,
         inference_payload_id: Optional[int] = None,
         input_text: Optional[str] = None,
         output_text: Optional[str] = None,
         metadata: Optional[Any] = None,
         event_type: Optional[str] = None,
+        error_message: Optional[str] = None,
+        error_type: Optional[str] = None,
     ) -> None:
-        """
-        Publish and log a unified inference event matching both Inference and InferencePayload entities.
-        """
         status_val = status.value if isinstance(status, InferenceStatus) else str(status)
         started_at_str = format_instant(started_at)
         completed_at_str = format_instant(completed_at)
         lat_ms_val = int(round(latency_ms)) if latency_ms is not None else None
         meta_str = stringify_metadata(metadata)
 
-        # Build payload representation
         payload_data = {
             "input": input_text,
             "output": output_text,
             "metadata": meta_str,
         }
 
-        # Unified JSON payload with camelCase (matching Java entities) and snake_case aliases
         event_body: Dict[str, Any] = {
-            # === com.utiliy.ILIS.modules.entity.Inference properties ===
             "requestId": request_id,
             "model": model,
             "provider": provider,
             "userId": user_id,
+            "conversationId": conversation_id,
             "status": status_val,
             "startedAt": started_at_str,
             "completedAt": completed_at_str,
@@ -182,17 +179,18 @@ class EventPublisherService:
             "outputTokens": output_tokens,
             "totalTokens": total_tokens,
             "inferencePayloadId": inference_payload_id,
+            "errorMessage": error_message,
+            "errorType": error_type,
 
-            # === com.utiliy.ILIS.modules.entity.InferencePayload properties ===
             "input": input_text,
             "output": output_text,
             "metadata": meta_str,
             "inferencePayload": payload_data,
             "payload": payload_data,
 
-            # === Snake_case compatibility aliases ===
             "request_id": request_id,
             "user_id": user_id,
+            "conversation_id": conversation_id,
             "started_at": started_at_str,
             "completed_at": completed_at_str,
             "latency_ms": lat_ms_val,
@@ -200,12 +198,14 @@ class EventPublisherService:
             "output_tokens": output_tokens,
             "total_tokens": total_tokens,
             "inference_payload_id": inference_payload_id,
+            "error_message": error_message,
+            "error_type": error_type,
+            "error": error_message,
             "event_type": event_type or status_val,
         }
 
         dispatch_type = event_type or status_val
 
-        # Explicitly log the triggered event payload
         logger.info(
             f"⚡ [EVENT TRIGGERED] type='{dispatch_type}' | status='{status_val}' | requestId='{request_id}' | model='{model}' | provider='{provider}' | latency={lat_ms_val}ms | tokens={total_tokens}\n"
             f"📄 Event Payload:\n{json.dumps(event_body, indent=2, default=str)}"
@@ -269,13 +269,13 @@ class EventPublisherService:
         started_at: datetime,
         completed_at: datetime,
         latency_ms: Union[int, float],
+        conversation_id: Optional[int] = None,
         input_tokens: Optional[int] = None,
         output_tokens: Optional[int] = None,
         total_tokens: Optional[int] = None,
         user_id: Optional[int] = None,
         metadata: Optional[Any] = None,
     ) -> None:
-        """Publish and log SUCCESS inference status event with token metrics and latency."""
         await self.publish_inference_event(
             request_id=request_id,
             model=model,
@@ -284,6 +284,7 @@ class EventPublisherService:
             started_at=started_at,
             completed_at=completed_at,
             latency_ms=latency_ms,
+            conversation_id=conversation_id,
             input_tokens=input_tokens,
             output_tokens=output_tokens,
             total_tokens=total_tokens,
@@ -303,16 +304,19 @@ class EventPublisherService:
         error_message: str,
         started_at: datetime,
         completed_at: datetime,
+        conversation_id: Optional[int] = None,
         input_tokens: Optional[int] = None,
         latency_ms: Optional[Union[int, float]] = None,
         user_id: Optional[int] = None,
         metadata: Optional[Any] = None,
+        error_type: Optional[str] = None,
     ) -> None:
-        """Publish and log FAILED inference status event with error details."""
         meta_dict = {}
         if isinstance(metadata, dict):
             meta_dict = dict(metadata)
         meta_dict["error"] = error_message
+        if error_type:
+            meta_dict["error_type"] = error_type
 
         await self.publish_inference_event(
             request_id=request_id,
@@ -322,15 +326,17 @@ class EventPublisherService:
             started_at=started_at,
             completed_at=completed_at,
             latency_ms=latency_ms,
+            conversation_id=conversation_id,
             input_tokens=input_tokens,
             input_text=input_text,
             output_text=f"ERROR: {error_message}",
             user_id=user_id,
             metadata=meta_dict,
             event_type="FAILED",
+            error_message=error_message,
+            error_type=error_type,
         )
 
-    # === Backward-compatible wrappers ===
     async def publish_message_request(
         self,
         conversation_id: int,
@@ -411,5 +417,4 @@ class EventPublisherService:
         )
 
 
-# Singleton instance
 event_publisher = EventPublisherService()

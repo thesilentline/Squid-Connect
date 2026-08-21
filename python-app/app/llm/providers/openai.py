@@ -80,7 +80,6 @@ class OpenAIConnector(LLMConnector):
             "Content-Type": "application/json",
         }
 
-        # Include organization or project headers if specified in custom_params
         if "organization" in self.custom_params:
             headers["OpenAI-Organization"] = self.custom_params["organization"]
 
@@ -96,7 +95,7 @@ class OpenAIConnector(LLMConnector):
 
         async with httpx.AsyncClient(timeout=60.0) as client:
             response = await client.post(endpoint_url, json=payload, headers=headers)
-            
+
             if response.status_code != 200:
                 error_msg = response.text
                 try:

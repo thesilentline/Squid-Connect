@@ -1,12 +1,12 @@
 from typing import List, Optional
-from sqlalchemy import select
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.conversation import Conversation
 from app.models.message import Message
 
 
 class MessageRepository:
-    """Repository handling Message persistence."""
 
     def __init__(self, session: AsyncSession):
         self.session = session
@@ -18,7 +18,6 @@ class MessageRepository:
         content: str,
         tokens_used: Optional[int] = None,
     ) -> Message:
-        """Create and persist a new chat message."""
         message = Message(
             conversation_id=conversation_id,
             role=role,
@@ -26,8 +25,13 @@ class MessageRepository:
             tokens_used=tokens_used,
         )
         self.session.add(message)
+        await self.session.execute(
+            update(Conversation)
+            .where(Conversation.id == conversation_id)
+            .values(updated_at=func.now())
+        )
         await self.session.commit()
-        await self.session.refresh(message)
+        await self.session.refresh(message, ["id", "conversation_id", "role", "content", "tokens_used", "created_at"])
         return message
 
     async def get_messages_by_conversation(
@@ -46,6 +50,5 @@ class MessageRepository:
         )
         result = await self.session.execute(query)
         messages = list(result.scalars().all())
-        # Reverse to return in chronological order (oldest to newest)
         messages.reverse()
         return messages

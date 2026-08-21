@@ -23,7 +23,7 @@ from app.services.llm_config_service import LLMConfigService
 class ChatService:
     """
     Open Universal Chat Orchestraction Service.
-    
+
     Handles:
     - Creating new chat sessions (Feature 1)
     - Browsing and reading existing chat sessions with full request/response history (Feature 2)
@@ -93,99 +93,91 @@ class ChatService:
         - Automatically creates a new conversation or loads the existing one
         - Resolves provider credentials from DB
         - Generates unique requestId and tracks accurate startedAt/completedAt/latencyMs
-        - Persists user prompt and assistant response in DB
+        - Persists user prompt and assistant response (or error message on failure) in DB
         - Dispatches structured events conforming to Java Inference and InferencePayload entities
         """
-        # 1. Generate unique request identifier and start timestamp
         request_id = request.request_id or str(uuid.uuid4())
         started_at = datetime.now(timezone.utc)
+        start_perf = time.perf_counter()
         user_id = request.user_id
 
-        # 2. Dynamically resolve LLM connector from stored DB credentials
-        connector, target_model, provider_config = await self.llm_config_service.resolve_connector(
-            provider=request.provider,
-            model=request.model,
-        )
-        provider_name = connector.get_provider_name()
-
-        # 3. Create or load Conversation
+        provider_name = request.provider or "unknown"
+        target_model = request.model or "unknown"
         conversation_id = request.conversation_id
-        if conversation_id:
-            conversation = await self.conversation_repo.get_by_id(conversation_id)
-            if not conversation:
+        conversation = None
+        user_message_record = None
+        formatted_history: List[Dict[str, Any]] = []
+        history_limit = settings.MAX_HISTORY_MESSAGES
+
+        try:
+            if conversation_id:
+                conversation = await self.conversation_repo.get_by_id(conversation_id)
+                if not conversation:
+                    title_preview = request.message[:35].strip() + ("..." if len(request.message) > 35 else "")
+                    conversation = await self.conversation_repo.create_conversation(
+                        title=title_preview,
+                        provider=request.provider,
+                        model=request.model,
+                    )
+                    conversation_id = conversation.id
+            else:
                 title_preview = request.message[:35].strip() + ("..." if len(request.message) > 35 else "")
                 conversation = await self.conversation_repo.create_conversation(
                     title=title_preview,
-                    provider=provider_name,
-                    model=target_model,
+                    provider=request.provider,
+                    model=request.model,
                 )
                 conversation_id = conversation.id
-        else:
-            # Start new conversation automatically titled from first prompt
-            title_preview = request.message[:35].strip() + ("..." if len(request.message) > 35 else "")
-            conversation = await self.conversation_repo.create_conversation(
-                title=title_preview,
-                provider=provider_name,
-                model=target_model,
+
+            user_message_record = await self.message_repo.create_message(
+                conversation_id=conversation_id,
+                role="user",
+                content=request.message,
             )
-            conversation_id = conversation.id
 
-        # 4. Save user prompt message to database
-        user_message_record = await self.message_repo.create_message(
-            conversation_id=conversation_id,
-            role="user",
-            content=request.message,
-        )
+            user_message_id = user_message_record.id
+            user_message_created_at = user_message_record.created_at.isoformat() if user_message_record.created_at else None
 
-        # 5. Fetch the latest max 5 messages for multi-turn conversation context
-        history_limit = settings.MAX_HISTORY_MESSAGES
-        history_records = await self.message_repo.get_messages_by_conversation(
-            conversation_id=conversation_id,
-            limit=history_limit,
-        )
+            history_records = await self.message_repo.get_messages_by_conversation(
+                conversation_id=conversation_id,
+                limit=history_limit,
+            )
 
-        # Build clean JSON multi-turn history list (max 5)
-        formatted_history = [
-            {
-                "id": m.id,
-                "role": m.role,
-                "content": m.content,
-                "tokens_used": m.tokens_used,
-                "created_at": m.created_at.isoformat() if m.created_at else None,
-            }
-            for m in history_records
-        ]
+            formatted_history = [
+                {
+                    "id": m.id,
+                    "role": m.role,
+                    "content": m.content,
+                    "tokens_used": m.tokens_used,
+                    "created_at": m.created_at.isoformat() if m.created_at else None,
+                }
+                for m in history_records
+            ]
 
-        # 6. Publish PROCESSING / RECEIVED Inference Event (matching Java Inference & InferencePayload)
-        request_metadata = {
-            "conversation_id": conversation_id,
-            "system_prompt": request.system_prompt,
-            "temperature": request.temperature,
-            "max_tokens": request.max_tokens,
-            "extra_params": request.extra_params,
-            "conversation_history": formatted_history,
-        }
-        # await event_publisher.publish_inference_processing(
-        #     request_id=request_id,
-        #     model=target_model,
-        #     provider=provider_name,
-        #     input_text=request.message,
-        #     user_id=user_id,
-        #     started_at=started_at,
-        #     metadata=request_metadata,
-        # )
+            connector, resolved_model, provider_config = await self.llm_config_service.resolve_connector(
+                provider=request.provider or (conversation.provider if conversation else None),
+                model=request.model or (conversation.model if conversation else None),
+            )
+            provider_name = connector.get_provider_name()
+            target_model = resolved_model
 
-        # 7. Format chat messages for LLM connector (max 5 recent context)
-        llm_messages: List[ChatMessage] = []
-        if request.system_prompt:
-            llm_messages.append(ChatMessage(role="system", content=request.system_prompt))
+            if conversation and (not conversation.provider or not conversation.model):
+                try:
+                    if not conversation.provider:
+                        conversation.provider = provider_name
+                    if not conversation.model:
+                        conversation.model = target_model
+                    await self.session.commit()
+                except Exception:
+                    pass
 
-        for msg in history_records:
-            llm_messages.append(ChatMessage(role=msg.role, content=msg.content))
+            llm_messages: List[ChatMessage] = []
+            if request.system_prompt:
+                llm_messages.append(ChatMessage(role="system", content=request.system_prompt))
 
-        # 8. Generate response using the resolved LLM provider connector with latency tracking
-        start_perf = time.perf_counter()
-        try:
+            for msg in history_records:
+                llm_messages.append(ChatMessage(role=msg.role, content=msg.content))
+
             llm_response: LLMResponse = await connector.generate_chat(
                 messages=llm_messages,
                 model=target_model,
@@ -196,7 +188,6 @@ class ChatService:
             completed_at = datetime.now(timezone.utc)
             latency_ms = int(round((time.perf_counter() - start_perf) * 1000))
 
-            # 9. Persist assistant reply to database
             assistant_message_record = await self.message_repo.create_message(
                 conversation_id=conversation_id,
                 role="assistant",
@@ -204,7 +195,6 @@ class ChatService:
                 tokens_used=llm_response.tokens_total,
             )
 
-            # Full history including the generated assistant reply (capped to max 5)
             full_turn_history = (formatted_history + [
                 {
                     "id": assistant_message_record.id,
@@ -215,7 +205,6 @@ class ChatService:
                 }
             ])[-history_limit:]
 
-            # 10. Publish SUCCESS Inference Event (matching Java Inference & InferencePayload)
             success_metadata = {
                 "conversation_id": conversation_id,
                 "system_prompt": request.system_prompt,
@@ -234,6 +223,7 @@ class ChatService:
                 started_at=started_at,
                 completed_at=completed_at,
                 latency_ms=latency_ms,
+                conversation_id=conversation_id,
                 input_tokens=llm_response.tokens_prompt,
                 output_tokens=llm_response.tokens_completion,
                 total_tokens=llm_response.tokens_total,
@@ -241,7 +231,6 @@ class ChatService:
                 metadata=success_metadata,
             )
 
-            # 11. Return structured response
             return ChatResponse(
                 response=llm_response.content,
                 conversation_id=conversation_id,
@@ -260,31 +249,116 @@ class ChatService:
         except Exception as error:
             completed_at = datetime.now(timezone.utc)
             latency_ms = int(round((time.perf_counter() - start_perf) * 1000))
-            
-            # Publish FAILED Inference Event (matching Java Inference & InferencePayload)
+            error_message_str = str(error)
+            error_type_str = error.__class__.__name__
+            error_content = error_message_str
+
+            if not conversation_id:
+                try:
+                    title_preview = request.message[:35].strip() + ("..." if len(request.message) > 35 else "")
+                    fallback_conv = await self.conversation_repo.create_conversation(
+                        title=title_preview,
+                        provider=request.provider or (provider_name if provider_name != "unknown" else None),
+                        model=request.model or (target_model if target_model != "unknown" else None),
+                    )
+                    conversation_id = fallback_conv.id
+                except Exception as conv_err:
+                    print(f"[ChatService] Could not create fallback conversation on error: {conv_err}")
+
+            user_msg_id = locals().get("user_message_id")
+            user_msg_created_at = locals().get("user_message_created_at")
+
+            if conversation_id and not user_msg_id:
+                try:
+                    user_message_record = await self.message_repo.create_message(
+                        conversation_id=conversation_id,
+                        role="user",
+                        content=request.message,
+                    )
+                    user_msg_id = user_message_record.id
+                    user_msg_created_at = user_message_record.created_at.isoformat() if user_message_record.created_at else None
+                except Exception as usr_err:
+                    print(f"[ChatService] Could not save user prompt on error: {usr_err}")
+
+            failed_msg_id = None
+            failed_msg_created_at = None
+            if conversation_id:
+                try:
+                    failed_message_record = await self.message_repo.create_message(
+                        conversation_id=conversation_id,
+                        role="assistant",
+                        content=error_content,
+                        tokens_used=None,
+                    )
+                    failed_msg_id = failed_message_record.id
+                    failed_msg_created_at = failed_message_record.created_at.isoformat() if failed_message_record.created_at else None
+                except Exception as err_rec_err:
+                    print(f"[ChatService] Could not save failed message to conversation: {err_rec_err}")
+
+            failed_history = list(formatted_history)
+            if user_msg_id and not any(m.get("id") == user_msg_id for m in failed_history):
+                failed_history.append({
+                    "id": user_msg_id,
+                    "role": "user",
+                    "content": request.message,
+                    "tokens_used": None,
+                    "created_at": user_msg_created_at,
+                })
+            if failed_msg_id:
+                failed_history.append({
+                    "id": failed_msg_id,
+                    "role": "assistant",
+                    "content": error_content,
+                    "tokens_used": None,
+                    "created_at": failed_msg_created_at,
+                })
+            failed_history = failed_history[-history_limit:]
+
             failed_metadata = {
                 "conversation_id": conversation_id,
                 "system_prompt": request.system_prompt,
                 "temperature": request.temperature,
                 "extra_params": request.extra_params,
-                "conversation_history": formatted_history,
+                "conversation_history": failed_history,
+                "error": error_message_str,
+                "error_type": error_type_str,
             }
-            logged_error = str(error)
+
+            logged_error = error_message_str
             print(f"*****************************[ChatService] error={logged_error}********************************")
-            await event_publisher.publish_inference_failed(
+
+            try:
+                await event_publisher.publish_inference_failed(
+                    request_id=request_id,
+                    model=target_model if target_model != "unknown" else (request.model or "unknown"),
+                    provider=provider_name if provider_name != "unknown" else (request.provider or "unknown"),
+                    input_text=request.message,
+                    error_message=error_message_str,
+                    started_at=started_at,
+                    completed_at=completed_at,
+                    latency_ms=latency_ms,
+                    conversation_id=conversation_id,
+                    user_id=user_id,
+                    metadata=failed_metadata,
+                    error_type=error_type_str,
+                )
+            except Exception as pub_err:
+                print(f"[ChatService] Could not publish failed inference event: {pub_err}")
+
+            return ChatResponse(
+                response=error_content,
+                conversation_id=conversation_id,
+                provider=provider_name if provider_name != "unknown" else (request.provider or "unknown"),
+                model=target_model if target_model != "unknown" else (request.model or "unknown"),
                 request_id=request_id,
-                model=target_model,
-                provider=provider_name,
-                input_text=request.message,
-                error_message=str(error),
-                started_at=started_at,
-                # input_tokens=input_tokens,
-                completed_at=completed_at,
-                latency_ms=latency_ms,
                 user_id=user_id,
-                metadata=failed_metadata,
+                status=InferenceStatus.FAILED.value,
+                latency_ms=latency_ms,
+                tokens_prompt=None,
+                tokens_completion=None,
+                tokens_total=None,
+                finish_reason="error",
             )
-            raise error
 
     def _build_conversation_response(self, conv: Conversation) -> ConversationResponse:
         """Helper to build ConversationResponse schema."""

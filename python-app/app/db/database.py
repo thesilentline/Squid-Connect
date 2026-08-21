@@ -10,7 +10,6 @@ class Base(DeclarativeBase):
     pass
 
 
-# Async engine with connection pooling
 engine = create_async_engine(
     settings.DATABASE_URL,
     echo=False,
@@ -19,7 +18,6 @@ engine = create_async_engine(
     max_overflow=20,
 )
 
-# Async session factory
 AsyncSessionLocal = async_sessionmaker(
     bind=engine,
     class_=AsyncSession,

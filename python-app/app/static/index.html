@@ -5,32 +5,32 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Squid Connect</title>
-  <!-- Google Fonts: Inter + JetBrains Mono -->
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link
     href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"
     rel="stylesheet">
-  <!-- Marked for Markdown Rendering -->
+
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-  <!-- Highlight.js for Syntax Highlighting -->
+
   <link rel="stylesheet"
     href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github-dark.min.css">
   <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
-  <!-- Chart.js for Dashboard Metrics -->
+
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 
   <style>
     :root {
-      /* ---- Squid Connect palette, sampled from brand reference ---- */
+
       --olive: #5E9831;
-      /* primary brand */
+
       --lime: #C1DB49;
-      /* bright signal / pulse */
+
       --sage: #9BC854;
-      /* secondary / success */
+
       --forest: #3C6E31;
-      /* deep / pressed */
+
 
       --bg-primary: #0A0E07;
       --bg-drawer: #0F1409;
@@ -83,18 +83,14 @@
       color: #fff;
     }
 
-    /* =========================================================
-       APP SHELL
-       ========================================================= */
+
     .app-shell {
       display: flex;
       height: 100vh;
       width: 100%;
     }
 
-    /* ---------------------------------------------------------
-       DRAWER (persistent, collapsible side navigation)
-       --------------------------------------------------------- */
+
     .drawer {
       width: 224px;
       flex-shrink: 0;
@@ -293,9 +289,7 @@
       border-top: 1px solid var(--border-color);
     }
 
-    /* ---------------------------------------------------------
-       MAIN APP AREA / PAGE SWITCHING
-       --------------------------------------------------------- */
+
     .app-main {
       flex: 1;
       display: flex;
@@ -319,9 +313,7 @@
       overflow-y: auto;
     }
 
-    /* =========================================================
-       DASHBOARD PAGE
-       ========================================================= */
+
     .dash-inner {
       max-width: 980px;
       margin: 0 auto;
@@ -405,7 +397,7 @@
       background-color: var(--accent-hover);
     }
 
-    /* Stat row */
+
     .stat-row {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
@@ -445,7 +437,7 @@
       color: var(--sage);
     }
 
-    /* Sections */
+
     .dash-section {
       margin-bottom: 36px;
     }
@@ -563,9 +555,7 @@
       text-decoration: underline;
     }
 
-    /* =========================================================
-       CHAT PAGE
-       ========================================================= */
+
     .chats-section-title {
       font-family: var(--font-mono);
       font-size: 0.68rem;
@@ -1006,9 +996,7 @@
       cursor: not-allowed;
     }
 
-    /* =========================================================
-       MODALS
-       ========================================================= */
+
     .modal-overlay {
       position: fixed;
       inset: 0;
@@ -1104,7 +1092,7 @@
       background-color: var(--accent-hover);
     }
 
-    /* Scrollbars */
+
     ::-webkit-scrollbar {
       width: 8px;
       height: 8px;
@@ -1123,9 +1111,7 @@
       background: var(--forest);
     }
 
-    /* =========================================================
-       DASHBOARD METRICS (Live API section)
-       ========================================================= */
+
     .metrics-toolbar {
       display: flex;
       align-items: flex-end;
@@ -1328,7 +1314,7 @@
 
   <div class="app-shell">
 
-    <!-- ================= SIDE DRAWER ================= -->
+
     <nav class="drawer" id="drawer">
       <div class="drawer-top">
         <div class="brand-row">
@@ -1373,7 +1359,7 @@
       </div>
 
       <div class="chats-section-title">Previous chats</div>
-      <div class="chats-list" id="chatsList"><!-- injected --></div>
+      <div class="chats-list" id="chatsList"></div>
 
       <div class="drawer-bottom">
         <button class="nav-item" onclick="openSettingsModal()">
@@ -1389,10 +1375,10 @@
       </div>
     </nav>
 
-    <!-- ================= MAIN APP AREA ================= -->
+
     <main class="app-main">
 
-      <!-- ---------- DASHBOARD PAGE ---------- -->
+
       <section class="page active" id="dashboardPage">
         <div class="dash-inner">
           <header class="dash-header">
@@ -1411,14 +1397,14 @@
             </button>
           </header>
 
-          <div class="stat-row" id="statRow"><!-- injected --></div>
+          <div class="stat-row" id="statRow"></div>
 
           <div class="dash-section">
             <div class="dash-section-title">Quick start</div>
-            <div class="quickstart-row" id="quickstartRow"><!-- injected --></div>
+            <div class="quickstart-row" id="quickstartRow"></div>
           </div>
 
-          <!-- ============ LIVE METRICS (Dashboard API) ============ -->
+
           <div class="dash-section">
             <div class="dash-section-title">Live metrics</div>
 
@@ -1461,7 +1447,7 @@
               <span class="metrics-status" id="metricsStatus">Not loaded yet</span>
             </div>
 
-            <div class="metrics-stat-row" id="metricsStatRow"><!-- injected --></div>
+            <div class="metrics-stat-row" id="metricsStatRow"></div>
 
             <div class="chart-grid">
               <div class="chart-card">
@@ -1512,12 +1498,12 @@
 
           <div class="dash-section">
             <div class="dash-section-title">Recent chats</div>
-            <div id="recentList"><!-- injected --></div>
+            <div id="recentList"></div>
           </div>
         </div>
       </section>
 
-      <!-- ---------- CHAT PAGE ---------- -->
+
       <section class="page" id="chatPage">
         <div class="chat-main">
           <header class="top-bar">
@@ -1539,12 +1525,12 @@
                 <option value="anthropic">Anthropic Claude</option>
                 <option value="gemini">Google Gemini</option>
               </select>
-              <select class="select-dropdown" id="modelSelect"><!-- injected --></select>
+              <select class="select-dropdown" id="modelSelect"></select>
             </div>
           </header>
 
           <section class="messages-container" id="messagesContainer">
-            <div class="messages-inner" id="messagesList"><!-- injected --></div>
+            <div class="messages-inner" id="messagesList"></div>
           </section>
 
           <footer class="input-wrapper">
@@ -1570,7 +1556,7 @@
     </main>
   </div>
 
-  <!-- Provider Settings Modal -->
+
   <div class="modal-overlay" id="settingsModal">
     <div class="modal">
       <div class="modal-title">Configure Provider Credentials</div>
@@ -1599,7 +1585,7 @@
     </div>
   </div>
 
-  <!-- Rename Chat Modal -->
+
   <div class="modal-overlay" id="renameModal">
     <div class="modal">
       <div class="modal-title">Rename Chat</div>
@@ -1637,7 +1623,7 @@
       gemini: 'Google Gemini'
     };
 
-    // Cycle through the brand palette for quick-start chip dots / recent items
+
     const paletteCycle = ['var(--olive)', 'var(--lime)', 'var(--sage)', 'var(--forest)'];
 
     window.addEventListener('DOMContentLoaded', async () => {
@@ -1649,9 +1635,7 @@
       fetchDashboardMetrics();
     });
 
-    /* =========================================================
-       NAVIGATION (drawer -> pages)
-       ========================================================= */
+
     function navigateTo(page) {
       currentPage = page;
       document.getElementById('dashboardPage').classList.toggle('active', page === 'dashboard');
@@ -1693,9 +1677,7 @@
       });
     }
 
-    /* =========================================================
-       DASHBOARD RENDERING
-       ========================================================= */
+
     function renderDashboard() {
       renderQuickstartRow();
     }
@@ -1722,9 +1704,7 @@
       selectConversation(id);
     }
 
-    /* =========================================================
-       LIVE DASHBOARD METRICS (backend /dashboard/metrics API)
-       ========================================================= */
+
     function initMetricsDefaultRange() {
       const now = new Date();
       const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
@@ -1739,7 +1719,7 @@
 
     function localInputToIso(value) {
       if (!value) return null;
-      // Treat the picked value as UTC wall-clock time, matching the API's Z-suffixed params.
+
       return value.length === 16 ? `${value}:00Z` : `${value}Z`;
     }
 
@@ -1763,7 +1743,7 @@
       const resp = await fetch(url, { headers: { 'Accept': 'application/json' } });
       const raw = await resp.text();
       let data = null;
-      try { data = raw ? JSON.parse(raw) : null; } catch (e) { /* leave data null, raw text logged below */ }
+      try { data = raw ? JSON.parse(raw) : null; } catch (e) {  }
 
       console.log(`[Dashboard API] ${label} →`, url);
       console.log(`[Dashboard API] ${label} status:`, resp.status, resp.ok ? 'OK' : 'FAILED');
@@ -1773,9 +1753,7 @@
       return data;
     }
 
-    // Split into two independent, parallel calls:
-    //  - /dashboard/summary  -> feeds the stat cards
-    //  - /dashboard/timeseries -> feeds the charts + table
+
     async function fetchDashboardMetrics() {
       const statusEl = document.getElementById('metricsStatus');
       const btn = document.getElementById('btnMetricsRefresh');
@@ -1979,9 +1957,7 @@
     function fmtMs(v) { return (v === null || v === undefined) ? '—' : `${Number(v).toFixed(1)} ms`; }
     function fmtPct(v) { return (v === null || v === undefined) ? '—' : `${Number(v).toFixed(2)}%`; }
 
-    /* =========================================================
-       CONVERSATIONS (chat page)
-       ========================================================= */
+
     async function loadConversations() {
       try {
         const resp = await fetch(`${API_BASE}/conversations`);
@@ -2054,7 +2030,7 @@
       }
     }
 
-    // Rename Entity API Interaction
+
     function openRenameModal(e, id, currentTitle) {
       if (e) e.stopPropagation();
       renamingConversationId = id;
@@ -2234,6 +2210,7 @@
         } else {
           const err = await resp.json();
           appendMessageBubble('assistant', `Error: ${err.detail || 'Failed to get answer from LLM.'}`);
+          await loadConversations();
         }
       } catch (err) {
         removeTypingIndicator();

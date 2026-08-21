@@ -7,7 +7,7 @@ Usage:
 
 import asyncio
 from app.db.database import Base, engine
-import app.models  # noqa: F401
+import app.models
 
 
 async def init_tables():

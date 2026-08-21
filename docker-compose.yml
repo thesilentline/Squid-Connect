@@ -41,6 +41,9 @@ services:
     ports:
       - "8080:8080"
 
+    volumes:
+      - ./python-app:/app
+
     networks:
       - app-network
 

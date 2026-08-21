@@ -8,7 +8,6 @@ from app.api.llm_configs import router as llm_configs_router
 
 api_router = APIRouter()
 
-# Core LLM configs, Chat, and Conversations
 api_router.include_router(llm_configs_router, prefix="/llm", tags=["LLM Provider Credentials & Models"])
 api_router.include_router(chat_router, prefix="/chat", tags=["Chat"])
 api_router.include_router(conversations_router, prefix="/conversations", tags=["Conversations"])

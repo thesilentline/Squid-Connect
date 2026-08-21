@@ -62,7 +62,7 @@ class ConversationRepository:
             last_msg = messages[-1].content if messages else None
             if last_msg and len(last_msg) > 80:
                 last_msg = last_msg[:80] + "..."
-            
+
             summaries.append({
                 "id": conv.id,
                 "title": conv.title,

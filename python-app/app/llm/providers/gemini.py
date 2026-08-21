@@ -84,7 +84,6 @@ class GeminiConnector(LLMConnector):
         base_api_url = self.base_url.rstrip('/') if self.base_url else self.DEFAULT_BASE_URL
         endpoint_url = f"{base_api_url}/models/{target_model}:generateContent?key={self.api_key}"
 
-        # Convert chat messages to Gemini content parts
         contents = []
         system_instruction = None
 
@@ -113,7 +112,7 @@ class GeminiConnector(LLMConnector):
 
         async with httpx.AsyncClient(timeout=60.0) as client:
             response = await client.post(endpoint_url, json=payload)
-            
+
             if response.status_code != 200:
                 error_msg = response.text
                 try:
@@ -131,7 +130,7 @@ class GeminiConnector(LLMConnector):
             candidate = candidates[0]
             parts = candidate.get("content", {}).get("parts", [])
             text_content = "".join([part.get("text", "") for part in parts])
-            
+
             usage = data.get("usageMetadata", {})
             prompt_tokens = usage.get("promptTokenCount")
             completion_tokens = usage.get("candidatesTokenCount")

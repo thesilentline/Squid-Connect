@@ -59,7 +59,7 @@ class OllamaConnector(LLMConnector):
         return self.DEFAULT_BASE_URL
 
     def requires_api_key(self) -> bool:
-        return False  # Local instances usually don't require an API key
+        return False
 
     def requires_base_url(self) -> bool:
         return True
@@ -77,11 +77,9 @@ class OllamaConnector(LLMConnector):
     ) -> LLMResponse:
         target_model = model or self.default_model or self.DEFAULT_MODEL
         base_api = self.base_url.rstrip('/') if self.base_url else self.DEFAULT_BASE_URL
-        
-        # Ensure path ends with chat/completions
+
         if not base_api.endswith("/v1"):
             endpoint_url = f"{base_api}/api/chat"
-            # Standard Ollama native format
             payload = {
                 "model": target_model,
                 "messages": [{"role": m.role, "content": m.content} for m in messages],
@@ -108,13 +106,12 @@ class OllamaConnector(LLMConnector):
 
         async with httpx.AsyncClient(timeout=120.0) as client:
             response = await client.post(endpoint_url, json=payload, headers=headers)
-            
+
             if response.status_code != 200:
                 raise RuntimeError(f"Ollama/Local LLM error ({response.status_code}): {response.text}")
 
             data = response.json()
-            
-            # Handle both OpenAI-compatible format and native Ollama format
+
             if "choices" in data:
                 content = data["choices"][0]["message"]["content"]
                 usage = data.get("usage", {})

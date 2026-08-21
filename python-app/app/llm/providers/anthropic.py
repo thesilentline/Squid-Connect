@@ -74,7 +74,6 @@ class AnthropicConnector(LLMConnector):
             "Content-Type": "application/json",
         }
 
-        # Separate system messages from user/assistant messages for Claude's messages API
         system_content: Optional[str] = None
         formatted_messages: List[Dict[str, str]] = []
 
@@ -84,7 +83,6 @@ class AnthropicConnector(LLMConnector):
             else:
                 formatted_messages.append({"role": m.role, "content": m.content})
 
-        # Ensure there is at least one message
         if not formatted_messages:
             formatted_messages = [{"role": "user", "content": "Hello"}]
 
@@ -101,7 +99,7 @@ class AnthropicConnector(LLMConnector):
 
         async with httpx.AsyncClient(timeout=60.0) as client:
             response = await client.post(endpoint_url, json=payload, headers=headers)
-            
+
             if response.status_code != 200:
                 error_msg = response.text
                 try:

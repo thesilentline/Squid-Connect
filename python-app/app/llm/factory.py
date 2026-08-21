@@ -11,7 +11,7 @@ from app.llm.providers.ollama import OllamaConnector
 class LLMFactory:
     """
     Factory Pattern & Dynamic Registry for LLM Connectors.
-    
+
     Allows instantiating provider connectors dynamically at runtime based on:
     - Provider type ('openai', 'anthropic', 'gemini', 'groq', 'ollama', etc.)
     - Stored user API keys & custom base URLs
@@ -24,7 +24,6 @@ class LLMFactory:
         LLMProviderEnum.GEMINI.value: GeminiConnector,
         LLMProviderEnum.GROQ.value: GroqConnector,
         LLMProviderEnum.OLLAMA.value: OllamaConnector,
-        # Default alias for custom OpenAI-compatible endpoints
         LLMProviderEnum.CUSTOM.value: OpenAIConnector,
         LLMProviderEnum.AZURE_OPENAI.value: OpenAIConnector,
     }
@@ -65,7 +64,6 @@ class LLMFactory:
         """Return information and supported models for all registered providers."""
         infos: List[ProviderInfo] = []
         for provider_key, connector_cls in cls._registry.items():
-            # Skip alias duplicates in the main listing
             if provider_key in [LLMProviderEnum.CUSTOM.value, LLMProviderEnum.AZURE_OPENAI.value]:
                 continue
             instance = connector_cls()

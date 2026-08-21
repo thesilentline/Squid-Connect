@@ -7,7 +7,7 @@ class MessageResponse(BaseModel):
     """Schema representing a single message in a conversation."""
     id: int
     conversation_id: int
-    role: str  # 'user', 'assistant', 'system'
+    role: str
     content: str
     tokens_used: Optional[int] = None
     created_at: datetime
